@@ -1,6 +1,9 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-const box = 20;
+
+let box = 20; // 初始設定一格20px
+let gridWidth = 32; // 水平方向格子數
+let gridHeight = 24; // 垂直方向格子數
 
 let snake = [{ x: 9 * box, y: 10 * box }];
 let direction = "";
@@ -26,11 +29,28 @@ function startGame() {
   document.getElementById("start-screen").style.display = "none";
   document.getElementById("game-container").style.display = "block";
 
+  resizeCanvas();
   reset();
   spawnFood();
   spawnComputerSnakes();
   interval = setInterval(update, speed);
 }
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  
+  // 自動計算一格大小（依畫面大小算）
+  box = Math.min(
+    Math.floor(canvas.width / gridWidth),
+    Math.floor(canvas.height / gridHeight)
+  );
+}
+
+window.addEventListener("resize", () => {
+  resizeCanvas();
+});
+
 
 function reset() {
   snake = [{ x: 9 * box, y: 10 * box }];
@@ -98,17 +118,18 @@ function update() {
   if (paused) return;
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  
+
   moveSnake();
   moveComputerSnakes();
-  
+
   drawFood();
   drawSnake(snake, "#000");
-  
+
   for (let cSnake of computerSnakes) {
     drawSnake(cSnake.body, "#00f");
   }
 }
+
 
 function moveSnake() {
   if (!direction) return;
