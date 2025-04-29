@@ -1,211 +1,207 @@
-let canvas, ctx;
-let box = 20;
-let snake = [];
-let computerSnake = [];
-let direction = "RIGHT";
-let computerDirection = "LEFT";
-let food = {};
-let score = 0;
-let computerScore = 0;
-let gameInterval;
-let isPaused = false;
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const box = 20;
 
+let snake = [{ x: 9 * box, y: 10 * box }];
+let direction = "";
+let foods = [];
 let speed = 200;
-const minSpeed = 60;
-const speedStep = 10;
-
+let interval;
 let playerName = "";
-let leaderboard = [];
+let scores = [];
+let paused = false;
 
-window.onload = function() {
-  document.getElementById("startBtn").addEventListener("click", startGame);
-  const storedLeaderboard = localStorage.getItem("leaderboard");
-  if (storedLeaderboard) leaderboard = JSON.parse(storedLeaderboard);
-};
+// 多個電腦蛇
+let computerSnakes = [];
+let computerSpeed = 300;
+const computerCount = 3; // 電腦蛇數量
+
+document.getElementById("start-btn").onclick = startGame;
+document.getElementById("pause-btn").onclick = togglePause;
+document.getElementById("restart-btn").onclick = restartGame;
+document.addEventListener("keydown", move);
 
 function startGame() {
-  playerName = document.getElementById("playerName").value;
-  if (!playerName) {
-    alert("請輸入玩家名稱！");
-    return;
-  }
-
+  playerName = document.getElementById("player-name").value || "玩家";
   document.getElementById("start-screen").style.display = "none";
   document.getElementById("game-container").style.display = "block";
-  document.getElementById("restartBtn").style.display = "none";
-  document.getElementById("pauseBtn").style.display = "inline-block";
-  document.getElementById("pauseBtn").innerText = "暫停";
-  isPaused = false;
 
-  canvas = document.getElementById("gameCanvas");
-  ctx = canvas.getContext("2d");
+  reset();
+  spawnFood();
+  spawnComputerSnakes();
+  interval = setInterval(update, speed);
+}
 
-  snake = [{ x: 8 * box, y: 10 * box }];
-  computerSnake = [{ x: 12 * box, y: 10 * box }];
-  direction = "RIGHT";
-  computerDirection = "LEFT";
-  score = 0;
-  computerScore = 0;
+function reset() {
+  snake = [{ x: 9 * box, y: 10 * box }];
+  direction = "";
+  foods = [];
+  computerSnakes = [];
   speed = 200;
-  document.getElementById("score").innerText = "分數：" + score;
-
-  placeFood();
-
-  clearInterval(gameInterval);
-  gameInterval = setInterval(draw, speed);
-  document.removeEventListener("keydown", changeDirection);
-  document.addEventListener("keydown", changeDirection);
+  paused = false;
 }
 
-function placeFood() {
-  const maxCols = canvas.width / box;
-  const maxRows = canvas.height / box;
-
-  let newFood;
-  let overlapping;
-  do {
-    overlapping = false;
-    newFood = {
-      x: Math.floor(Math.random() * maxCols) * box,
-      y: Math.floor(Math.random() * maxRows) * box
-    };
-    for (let s of snake.concat(computerSnake)) {
-      if (s.x === newFood.x && s.y === newFood.y) {
-        overlapping = true;
-        break;
-      }
-    }
-  } while (overlapping);
-
-  food = newFood;
+function spawnFood() {
+  foods = [];
+  for (let i = 0; i < 5; i++) {
+    foods.push({
+      x: Math.floor(Math.random() * (canvas.width / box)) * box,
+      y: Math.floor(Math.random() * (canvas.height / box)) * box
+    });
+  }
 }
 
-function changeDirection(event) {
-  const key = event.keyCode;
-  if (key === 37 && direction !== "RIGHT") direction = "LEFT";
-  else if (key === 38 && direction !== "DOWN") direction = "UP";
-  else if (key === 39 && direction !== "LEFT") direction = "RIGHT";
-  else if (key === 40 && direction !== "UP") direction = "DOWN";
+function spawnComputerSnakes() {
+  for (let i = 0; i < computerCount; i++) {
+    computerSnakes.push({
+      body: [{ 
+        x: Math.floor(Math.random() * (canvas.width / box)) * box,
+        y: Math.floor(Math.random() * (canvas.height / box)) * box 
+      }],
+      direction: ["LEFT", "RIGHT", "UP", "DOWN"][Math.floor(Math.random() * 4)],
+      lastMoveTime: Date.now()
+    });
+  }
+}
+
+function move(event) {
+  if (event.key === "ArrowLeft" && direction !== "RIGHT") direction = "LEFT";
+  else if (event.key === "ArrowUp" && direction !== "DOWN") direction = "UP";
+  else if (event.key === "ArrowRight" && direction !== "LEFT") direction = "RIGHT";
+  else if (event.key === "ArrowDown" && direction !== "UP") direction = "DOWN";
 }
 
 function togglePause() {
-  if (isPaused) {
-    gameInterval = setInterval(draw, speed);
-    document.getElementById("pauseBtn").innerText = "暫停";
-  } else {
-    clearInterval(gameInterval);
-    document.getElementById("pauseBtn").innerText = "繼續";
-  }
-  isPaused = !isPaused;
+  paused = !paused;
 }
 
-function draw() {
+function restartGame() {
+  clearInterval(interval);
+  startGame();
+}
+
+function drawSnake(snakeBody, color) {
+  ctx.fillStyle = color;
+  for (let part of snakeBody) {
+    ctx.fillRect(part.x, part.y, box, box);
+  }
+}
+
+function drawFood() {
+  for (let f of foods) {
+    ctx.fillStyle = "#f00";
+    ctx.fillRect(f.x, f.y, box, box);
+  }
+}
+
+function update() {
+  if (paused) return;
+
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  moveSnake();
+  moveComputerSnakes();
+  
+  drawFood();
+  drawSnake(snake, "#000");
+  
+  for (let cSnake of computerSnakes) {
+    drawSnake(cSnake.body, "#00f");
+  }
+}
 
-  for (let i = 0; i < snake.length; i++) {
-    ctx.fillStyle = i === 0 ? "#0f0" : "#fff";
-    ctx.fillRect(snake[i].x, snake[i].y, box, box);
+function moveSnake() {
+  if (!direction) return;
+
+  let head = { x: snake[0].x, y: snake[0].y };
+  if (direction === "LEFT") head.x -= box;
+  if (direction === "UP") head.y -= box;
+  if (direction === "RIGHT") head.x += box;
+  if (direction === "DOWN") head.y += box;
+
+  // 撞牆死
+  if (head.x < 0 || head.x >= canvas.width || head.y < 0 || head.y >= canvas.height) {
+    gameOver();
+    return;
   }
 
-  for (let i = 0; i < computerSnake.length; i++) {
-    ctx.fillStyle = i === 0 ? "#f00" : "#fff";
-    ctx.fillRect(computerSnake[i].x, computerSnake[i].y, box, box);
-  }
-
-  ctx.fillStyle = "red";
-  ctx.fillRect(food.x, food.y, box, box);
-
-  let headX = snake[0].x;
-  let headY = snake[0].y;
-
-  if (direction === "LEFT") headX -= box;
-  if (direction === "RIGHT") headX += box;
-  if (direction === "UP") headY -= box;
-  if (direction === "DOWN") headY += box;
-
-  if (headX === food.x && headY === food.y) {
-    score++;
-    document.getElementById("score").innerText = "分數：" + score;
-    placeFood();
-    if (speed > minSpeed) {
-      speed -= speedStep;
-      clearInterval(gameInterval);
-      gameInterval = setInterval(draw, speed);
+  // 撞到自己死
+  for (let part of snake) {
+    if (head.x === part.x && head.y === part.y) {
+      gameOver();
+      return;
     }
-  } else {
+  }
+
+  // 吃食物
+  let ateFood = false;
+  for (let i = 0; i < foods.length; i++) {
+    if (head.x === foods[i].x && head.y === foods[i].y) {
+      foods.splice(i, 1);
+      ateFood = true;
+      updateSpeed();
+      break;
+    }
+  }
+  if (!ateFood) {
     snake.pop();
   }
 
-  let newHead = { x: headX, y: headY };
-  snake.unshift(newHead);
-
-  let computerHeadX = computerSnake[0].x;
-  let computerHeadY = computerSnake[0].y;
-
-  if (computerDirection === "LEFT") computerHeadX -= box;
-  if (computerDirection === "RIGHT") computerHeadX += box;
-  if (computerDirection === "UP") computerHeadY -= box;
-  if (computerDirection === "DOWN") computerHeadY += box;
-
-  if (computerHeadX === food.x && computerHeadY === food.y) {
-    computerScore++;
-    placeFood();
-  } else {
-    computerSnake.pop();
+  if (foods.length === 0) {
+    spawnFood();
   }
 
-  let computerNewHead = { x: computerHeadX, y: computerHeadY };
-  computerSnake.unshift(computerNewHead);
-
-  if (
-    collision(headX, headY, snake) ||
-    headX < 0 || headX >= canvas.width ||
-    headY < 0 || headY >= canvas.height
-  ) {
-    clearInterval(gameInterval);
-    alert("遊戲結束！你的分數是：" + score);
-    saveScore();
-    return;
-  }
-
-  if (collision(headX, headY, computerSnake)) {
-    clearInterval(gameInterval);
-    alert("你被電腦撞到了！你的分數是：" + score);
-    saveScore();
-    return;
-  }
-
-  const directions = ["LEFT", "RIGHT", "UP", "DOWN"];
-  computerDirection = directions[Math.floor(Math.random() * directions.length)];
+  snake.unshift(head);
 }
 
-function collision(x, y, snakeArray) {
-  for (let i = 1; i < snakeArray.length; i++) {
-    if (x === snakeArray[i].x && y === snakeArray[i].y) return true;
+function moveComputerSnakes() {
+  for (let cSnake of computerSnakes) {
+    let head = { x: cSnake.body[0].x, y: cSnake.body[0].y };
+
+    if (Date.now() - cSnake.lastMoveTime > 500) {
+      // 每 0.5 秒隨機換方向
+      cSnake.direction = ["LEFT", "RIGHT", "UP", "DOWN"][Math.floor(Math.random() * 4)];
+      cSnake.lastMoveTime = Date.now();
+    }
+
+    if (cSnake.direction === "LEFT") head.x -= box;
+    if (cSnake.direction === "UP") head.y -= box;
+    if (cSnake.direction === "RIGHT") head.x += box;
+    if (cSnake.direction === "DOWN") head.y += box;
+
+    // 電腦蛇穿牆
+    if (head.x < 0) head.x = canvas.width - box;
+    if (head.x >= canvas.width) head.x = 0;
+    if (head.y < 0) head.y = canvas.height - box;
+    if (head.y >= canvas.height) head.y = 0;
+
+    cSnake.body.unshift(head);
+    cSnake.body.pop();
   }
-  return false;
 }
 
-function saveScore() {
-  leaderboard.push({ name: playerName, score: score });
-  leaderboard.sort((a, b) => b.score - a.score);
-  localStorage.setItem("leaderboard", JSON.stringify(leaderboard));
-  displayLeaderboard();
+function updateSpeed() {
+  if (speed > 50) {
+    speed -= 10;
+    clearInterval(interval);
+    interval = setInterval(update, speed);
+  }
 }
 
-function displayLeaderboard() {
-  const leaderboardList = document.getElementById("leaderboard-list");
-  leaderboardList.innerHTML = "";
-  leaderboard.forEach((entry) => {
+function gameOver() {
+  clearInterval(interval);
+  alert(playerName + " 遊戲結束！分數：" + snake.length);
+  scores.push({ name: playerName, score: snake.length });
+  updateRanking();
+}
+
+function updateRanking() {
+  const ranking = document.getElementById("ranking");
+  ranking.innerHTML = "";
+  scores.sort((a, b) => b.score - a.score);
+  for (let player of scores) {
     const li = document.createElement("li");
-    li.textContent = `${entry.name}: ${entry.score}`;
-    leaderboardList.appendChild(li);
-  });
-  document.getElementById("leaderboard").style.display = "block";
-  document.getElementById("game-container").style.display = "none";
-}
-
-function backToStart() {
-  document.getElementById("leaderboard").style.display = "none";
-  document.getElementById("start-screen").style.display = "block";
+    li.textContent = `${player.name}: ${player.score}`;
+    ranking.appendChild(li);
+  }
 }
