@@ -4,6 +4,8 @@ body {
   background-color: #ffffff;
   margin: 0;
   padding: 0;
+  height: 100vh;
+  overflow: hidden;
 }
 
 #start-screen {
@@ -13,12 +15,17 @@ body {
 canvas {
   background-color: #ffffff;
   display: block;
-  margin: 20px auto;
+  margin: 0;
   border: 2px solid #000;
+  width: 100vw;
+  height: 100vh;
 }
 
 #controls {
-  margin: 10px;
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 #controls button {
@@ -28,5 +35,8 @@ canvas {
 }
 
 #score-board {
-  margin-top: 20px;
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
 }
