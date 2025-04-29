@@ -1,23 +1,19 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-let box = 20; // 初始設定一格20px
-let gridWidth = 32; // 水平方向格子數
-let gridHeight = 24; // 垂直方向格子數
+let box;
+let gridWidth = 40;
+let gridHeight = 30;
 
 let snake = [{ x: 9 * box, y: 10 * box }];
 let direction = "";
 let foods = [];
-let speed = 200;
+let speed = 150;
 let interval;
 let playerName = "";
-let scores = [];
 let paused = false;
-
-// 多個電腦蛇
 let computerSnakes = [];
-let computerSpeed = 300;
-const computerCount = 3; // 電腦蛇數量
+const computerCount = 5; // 增加電腦蛇數量！
 
 document.getElementById("start-btn").onclick = startGame;
 document.getElementById("pause-btn").onclick = togglePause;
@@ -28,7 +24,6 @@ function startGame() {
   playerName = document.getElementById("player-name").value || "玩家";
   document.getElementById("start-screen").style.display = "none";
   document.getElementById("game-container").style.display = "block";
-
   resizeCanvas();
   reset();
   spawnFood();
@@ -39,31 +34,25 @@ function startGame() {
 function resizeCanvas() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
-  
-  // 自動計算一格大小（依畫面大小算）
   box = Math.min(
     Math.floor(canvas.width / gridWidth),
     Math.floor(canvas.height / gridHeight)
   );
 }
 
-window.addEventListener("resize", () => {
-  resizeCanvas();
-});
-
+window.addEventListener("resize", resizeCanvas);
 
 function reset() {
   snake = [{ x: 9 * box, y: 10 * box }];
   direction = "";
   foods = [];
   computerSnakes = [];
-  speed = 200;
   paused = false;
 }
 
 function spawnFood() {
   foods = [];
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 10; i++) {
     foods.push({
       x: Math.floor(Math.random() * (canvas.width / box)) * box,
       y: Math.floor(Math.random() * (canvas.height / box)) * box
@@ -74,9 +63,9 @@ function spawnFood() {
 function spawnComputerSnakes() {
   for (let i = 0; i < computerCount; i++) {
     computerSnakes.push({
-      body: [{ 
+      body: [{
         x: Math.floor(Math.random() * (canvas.width / box)) * box,
-        y: Math.floor(Math.random() * (canvas.height / box)) * box 
+        y: Math.floor(Math.random() * (canvas.height / box)) * box
       }],
       direction: ["LEFT", "RIGHT", "UP", "DOWN"][Math.floor(Math.random() * 4)],
       lastMoveTime: Date.now()
@@ -86,9 +75,9 @@ function spawnComputerSnakes() {
 
 function move(event) {
   if (event.key === "ArrowLeft" && direction !== "RIGHT") direction = "LEFT";
-  else if (event.key === "ArrowUp" && direction !== "DOWN") direction = "UP";
-  else if (event.key === "ArrowRight" && direction !== "LEFT") direction = "RIGHT";
-  else if (event.key === "ArrowDown" && direction !== "UP") direction = "DOWN";
+  if (event.key === "ArrowUp" && direction !== "DOWN") direction = "UP";
+  if (event.key === "ArrowRight" && direction !== "LEFT") direction = "RIGHT";
+  if (event.key === "ArrowDown" && direction !== "UP") direction = "DOWN";
 }
 
 function togglePause() {
@@ -109,7 +98,7 @@ function drawSnake(snakeBody, color) {
 
 function drawFood() {
   for (let f of foods) {
-    ctx.fillStyle = "#f00";
+    ctx.fillStyle = "#ff0";
     ctx.fillRect(f.x, f.y, box, box);
   }
 }
@@ -117,19 +106,19 @@ function drawFood() {
 function update() {
   if (paused) return;
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   moveSnake();
   moveComputerSnakes();
 
   drawFood();
-  drawSnake(snake, "#000");
+  drawSnake(snake, "#0f0");
 
   for (let cSnake of computerSnakes) {
-    drawSnake(cSnake.body, "#00f");
+    drawSnake(cSnake.body, "#f0f");
   }
 }
-
 
 function moveSnake() {
   if (!direction) return;
@@ -140,13 +129,11 @@ function moveSnake() {
   if (direction === "RIGHT") head.x += box;
   if (direction === "DOWN") head.y += box;
 
-  // 撞牆死
   if (head.x < 0 || head.x >= canvas.width || head.y < 0 || head.y >= canvas.height) {
     gameOver();
     return;
   }
 
-  // 撞到自己死
   for (let part of snake) {
     if (head.x === part.x && head.y === part.y) {
       gameOver();
@@ -154,13 +141,12 @@ function moveSnake() {
     }
   }
 
-  // 吃食物
   let ateFood = false;
   for (let i = 0; i < foods.length; i++) {
     if (head.x === foods[i].x && head.y === foods[i].y) {
       foods.splice(i, 1);
       ateFood = true;
-      updateSpeed();
+      speedUp();
       break;
     }
   }
@@ -179,8 +165,7 @@ function moveComputerSnakes() {
   for (let cSnake of computerSnakes) {
     let head = { x: cSnake.body[0].x, y: cSnake.body[0].y };
 
-    if (Date.now() - cSnake.lastMoveTime > 500) {
-      // 每 0.5 秒隨機換方向
+    if (Date.now() - cSnake.lastMoveTime > 300) {
       cSnake.direction = ["LEFT", "RIGHT", "UP", "DOWN"][Math.floor(Math.random() * 4)];
       cSnake.lastMoveTime = Date.now();
     }
@@ -190,7 +175,6 @@ function moveComputerSnakes() {
     if (cSnake.direction === "RIGHT") head.x += box;
     if (cSnake.direction === "DOWN") head.y += box;
 
-    // 電腦蛇穿牆
     if (head.x < 0) head.x = canvas.width - box;
     if (head.x >= canvas.width) head.x = 0;
     if (head.y < 0) head.y = canvas.height - box;
@@ -201,9 +185,9 @@ function moveComputerSnakes() {
   }
 }
 
-function updateSpeed() {
+function speedUp() {
   if (speed > 50) {
-    speed -= 10;
+    speed -= 5;
     clearInterval(interval);
     interval = setInterval(update, speed);
   }
@@ -211,18 +195,5 @@ function updateSpeed() {
 
 function gameOver() {
   clearInterval(interval);
-  alert(playerName + " 遊戲結束！分數：" + snake.length);
-  scores.push({ name: playerName, score: snake.length });
-  updateRanking();
-}
-
-function updateRanking() {
-  const ranking = document.getElementById("ranking");
-  ranking.innerHTML = "";
-  scores.sort((a, b) => b.score - a.score);
-  for (let player of scores) {
-    const li = document.createElement("li");
-    li.textContent = `${player.name}: ${player.score}`;
-    ranking.appendChild(li);
-  }
+  alert(playerName + "，你掛了！總長度：" + snake.length);
 }
