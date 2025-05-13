@@ -1,199 +1,152 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-let box;
-let gridWidth = 40;
-let gridHeight = 30;
+const gridSize = 20;
+const tileCount = canvas.width / gridSize;
 
-let snake = [{ x: 9 * box, y: 10 * box }];
-let direction = "";
-let foods = [];
-let speed = 150;
-let interval;
-let playerName = "";
-let paused = false;
-let computerSnakes = [];
-const computerCount = 5; // 增加電腦蛇數量！
+let snake;
+let apple;
+let dx;
+let dy;
+let score;
+let gameInterval;
+let gameStarted = false;
+let gameTime;
+let startTime;
 
-document.getElementById("start-btn").onclick = startGame;
-document.getElementById("pause-btn").onclick = togglePause;
-document.getElementById("restart-btn").onclick = restartGame;
-document.addEventListener("keydown", move);
+// Firebase 設定
+const firebaseConfig = {
+    apiKey: "AIzaSyC58EgXUd82-r_x6NO_mt6oMl8hDFi5q0Q",
+    authDomain: "game-bc199.firebaseapp.com",
+    databaseURL: "https://game-bc199-default-rtdb.firebaseio.com",
+    projectId: "game-bc199",
+    storageBucket: "game-bc199.firebasestorage.app",
+    messagingSenderId: "319830123252",
+    appId: "1:319830123252:web:e1e497590dabef4e9ef4a1"
+};
+
+// 初始化 Firebase
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+
+function initGame() {
+    snake = [{ x: 10, y: 10 }];
+    apple = { x: 5, y: 5 };
+    dx = 1;
+    dy = 0;
+    score = 0;
+    gameTime = 0;
+    startTime = Date.now();
+}
+
+function gameLoop() {
+    if (!gameStarted) return;
+
+    const head = { x: snake[0].x + dx, y: snake[0].y + dy };
+
+    if (
+        head.x < 0 || head.y < 0 ||
+        head.x >= tileCount || head.y >= tileCount ||
+        snake.some(segment => segment.x === head.x && segment.y === head.y)
+    ) {
+        gameOver();
+        return;
+    }
+
+    snake.unshift(head);
+
+    if (head.x === apple.x && head.y === apple.y) {
+        score++;
+        apple = {
+            x: Math.floor(Math.random() * tileCount),
+            y: Math.floor(Math.random() * tileCount)
+        };
+    } else {
+        snake.pop();
+    }
+
+    draw();
+    gameTime = Math.floor((Date.now() - startTime) / 1000); // 計算遊玩秒數
+}
+
+function draw() {
+    ctx.fillStyle = "#222";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "lime";
+    snake.forEach(segment => {
+        ctx.fillRect(segment.x * gridSize, segment.y * gridSize, gridSize - 2, gridSize - 2);
+    });
+
+    ctx.fillStyle = "red";
+    ctx.fillRect(apple.x * gridSize, apple.y * gridSize, gridSize - 2, gridSize - 2);
+}
+
+document.addEventListener("keydown", e => {
+    if (!gameStarted) return;
+    switch (e.key) {
+        case "ArrowUp": if (dy === 0) { dx = 0; dy = -1; } break;
+        case "ArrowDown": if (dy === 0) { dx = 0; dy = 1; } break;
+        case "ArrowLeft": if (dx === 0) { dx = -1; dy = 0; } break;
+        case "ArrowRight": if (dx === 0) { dx = 1; dy = 0; } break;
+    }
+});
 
 function startGame() {
-  playerName = document.getElementById("player-name").value || "玩家";
-  document.getElementById("start-screen").style.display = "none";
-  document.getElementById("game-container").style.display = "block";
-  resizeCanvas();
-  reset();
-  spawnFood();
-  spawnComputerSnakes();
-  interval = setInterval(update, speed);
-}
-
-function resizeCanvas() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-  box = Math.min(
-    Math.floor(canvas.width / gridWidth),
-    Math.floor(canvas.height / gridHeight)
-  );
-}
-
-window.addEventListener("resize", resizeCanvas);
-
-function reset() {
-  snake = [{ x: 9 * box, y: 10 * box }];
-  direction = "";
-  foods = [];
-  computerSnakes = [];
-  paused = false;
-}
-
-function spawnFood() {
-  foods = [];
-  for (let i = 0; i < 10; i++) {
-    foods.push({
-      x: Math.floor(Math.random() * (canvas.width / box)) * box,
-      y: Math.floor(Math.random() * (canvas.height / box)) * box
-    });
-  }
-}
-
-function spawnComputerSnakes() {
-  for (let i = 0; i < computerCount; i++) {
-    computerSnakes.push({
-      body: [{
-        x: Math.floor(Math.random() * (canvas.width / box)) * box,
-        y: Math.floor(Math.random() * (canvas.height / box)) * box
-      }],
-      direction: ["LEFT", "RIGHT", "UP", "DOWN"][Math.floor(Math.random() * 4)],
-      lastMoveTime: Date.now()
-    });
-  }
-}
-
-function move(event) {
-  if (event.key === "ArrowLeft" && direction !== "RIGHT") direction = "LEFT";
-  if (event.key === "ArrowUp" && direction !== "DOWN") direction = "UP";
-  if (event.key === "ArrowRight" && direction !== "LEFT") direction = "RIGHT";
-  if (event.key === "ArrowDown" && direction !== "UP") direction = "DOWN";
-}
-
-function togglePause() {
-  paused = !paused;
-}
-
-function restartGame() {
-  clearInterval(interval);
-  startGame();
-}
-
-function drawSnake(snakeBody, color) {
-  ctx.fillStyle = color;
-  for (let part of snakeBody) {
-    ctx.fillRect(part.x, part.y, box, box);
-  }
-}
-
-function drawFood() {
-  for (let f of foods) {
-    ctx.fillStyle = "#ff0";
-    ctx.fillRect(f.x, f.y, box, box);
-  }
-}
-
-function update() {
-  if (paused) return;
-
-  ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  moveSnake();
-  moveComputerSnakes();
-
-  drawFood();
-  drawSnake(snake, "#0f0");
-
-  for (let cSnake of computerSnakes) {
-    drawSnake(cSnake.body, "#f0f");
-  }
-}
-
-function moveSnake() {
-  if (!direction) return;
-
-  let head = { x: snake[0].x, y: snake[0].y };
-  if (direction === "LEFT") head.x -= box;
-  if (direction === "UP") head.y -= box;
-  if (direction === "RIGHT") head.x += box;
-  if (direction === "DOWN") head.y += box;
-
-  if (head.x < 0 || head.x >= canvas.width || head.y < 0 || head.y >= canvas.height) {
-    gameOver();
-    return;
-  }
-
-  for (let part of snake) {
-    if (head.x === part.x && head.y === part.y) {
-      gameOver();
-      return;
-    }
-  }
-
-  let ateFood = false;
-  for (let i = 0; i < foods.length; i++) {
-    if (head.x === foods[i].x && head.y === foods[i].y) {
-      foods.splice(i, 1);
-      ateFood = true;
-      speedUp();
-      break;
-    }
-  }
-  if (!ateFood) {
-    snake.pop();
-  }
-
-  if (foods.length === 0) {
-    spawnFood();
-  }
-
-  snake.unshift(head);
-}
-
-function moveComputerSnakes() {
-  for (let cSnake of computerSnakes) {
-    let head = { x: cSnake.body[0].x, y: cSnake.body[0].y };
-
-    if (Date.now() - cSnake.lastMoveTime > 300) {
-      cSnake.direction = ["LEFT", "RIGHT", "UP", "DOWN"][Math.floor(Math.random() * 4)];
-      cSnake.lastMoveTime = Date.now();
-    }
-
-    if (cSnake.direction === "LEFT") head.x -= box;
-    if (cSnake.direction === "UP") head.y -= box;
-    if (cSnake.direction === "RIGHT") head.x += box;
-    if (cSnake.direction === "DOWN") head.y += box;
-
-    if (head.x < 0) head.x = canvas.width - box;
-    if (head.x >= canvas.width) head.x = 0;
-    if (head.y < 0) head.y = canvas.height - box;
-    if (head.y >= canvas.height) head.y = 0;
-
-    cSnake.body.unshift(head);
-    cSnake.body.pop();
-  }
-}
-
-function speedUp() {
-  if (speed > 50) {
-    speed -= 5;
-    clearInterval(interval);
-    interval = setInterval(update, speed);
-  }
+    initGame();
+    document.getElementById("startScreen").style.display = "none";
+    gameStarted = true;
+    gameInterval = setInterval(gameLoop, 100);
 }
 
 function gameOver() {
-  clearInterval(interval);
-  alert(playerName + "，你掛了！總長度：" + snake.length);
+    clearInterval(gameInterval);
+    gameStarted = false;
+    document.getElementById("finalScore").textContent = score;
+    document.getElementById("gameOverScreen").style.display = "flex";
+}
+
+function saveScore() {
+    const playerName = document.getElementById("playerName").value || "匿名玩家";
+    const now = new Date().toISOString();
+
+    const scoreData = {
+        name: playerName,
+        score: score,
+        time: gameTime,
+        savedAt: now
+    };
+
+    // 將分數儲存到 Firebase
+    database.ref("scores").push(scoreData)
+        .then(() => {
+            alert("分數已儲存！");
+            document.getElementById("gameOverScreen").style.display = "none";
+            showLeaderboard(); // 儲存後顯示排行榜
+        })
+        .catch(error => {
+            console.error("儲存分數失敗:", error);
+            alert("儲存分數失敗，請稍後再試。");
+        });
+}
+
+function showLeaderboard() {
+    const scoreList = document.getElementById("scoreList");
+    scoreList.innerHTML = ""; // 清空排行榜
+
+    // 從 Firebase 讀取分數並顯示
+    database.ref("scores").orderByChild("score").limitToLast(10).once("value", snapshot => {
+        snapshot.forEach(childSnapshot => {
+            const data = childSnapshot.val();
+            const li = document.createElement("li");
+            li.textContent = `${data.name} - 分數: ${data.score}, 時間: ${data.time} 秒`;
+            scoreList.appendChild(li);
+        });
+        document.getElementById("leaderboard").style.display = "block";
+    });
+}
+
+function showStartScreen() {
+    document.getElementById("leaderboard").style.display = "none";
+    document.getElementById("startScreen").style.display = "flex";
 }
